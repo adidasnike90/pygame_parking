@@ -48,6 +48,7 @@ class Lot:
 		self.l = l
 		self.is_occupied = is_occupied
 		self.rect = pygame.Rect(self.x, self.y, self.w, self.l)
+		self.hitbox = pygame.Rect(self.x - 15, self.y - 15, self.w + 30, self.l + 30)
 		
 	def render(self, screen):
 		pygame.draw.rect(screen, white, self.rect, 10)
@@ -78,12 +79,12 @@ class Game:
 	def walkable_space(self):
 		step_size = 15
 		grid = []
-		for y in range(self.height):
-			for x in range(self.width):
-				b_point = (x*step_size, y*step_size)
+		for y in range(0, self.height, step_size):
+			for x in range(0, self.width, step_size):
+				b_point = (x, y)
 				flag = True
 				for o in self.lots:
-					if o.rect.collidepoint(b_point):
+					if o.hitbox.collidepoint(b_point):
 						flag = False
 						break
 				if flag == True:
@@ -94,18 +95,11 @@ class Game:
 		return math.sqrt((point[0] - target[0])**2 + (point[1] - target[1])**2)
 		
 	def expand_node(self, point, target, grid, expanded, step):
-		if (point[0] - 1, point[1]) in grid:
-			if (point[0] - 1, point[1]) not in expanded:
-				expanded[(point[0] - 1, point[1])] = step + heuristic((point[0] - 1, point[1]), target)
-		if (point[0] + 1, point[1]) in grid:
-			if (point[0] + 1, point[1]) not in expanded:
-				expanded[(point[0] + 1, point[1])] = step + heuristic((point[0] + 1, point[1]), target)
-		if (point[0], point[1] - 1) in grid:
-			if (point[0], point[1] - 1) not in expanded:
-				expanded[(point[0], point[1] - 1)] = step + heuristic((point[0], point[1] - 1), target)
-		if (point[0], point[1] + 1) in grid:
-			if (point[0], point[1] + 1) not in expanded:
-				expanded[(point[0], point[1] + 1)] = step + heuristic((point[0], point[1] + 1), target)
+		temp_rect = pygame.Rect(point[0], point[1], 50, 50)
+		for g in grid:
+			if temp_rect.collidepoint(g):
+				expanded[g] = step + self.heuristic(g, target)
+		return expanded
 				
 	def pick_node(self, expanded):
 		res = list(expanded.keys())[0]
@@ -119,26 +113,26 @@ class Game:
 		
 	def find_path(self, car_pos, target_pos, grid):
 		target_rect = pygame.Rect(target_pos[0], target_pos[1], 15, 15)
+		car_rect = pygame.Rect(car_pos[0], car_pos[1], 50, 50)
 		expanded = dict()
 		waypoints = []
 		current_node = (0, 0)
 		step = 0
 		for p in grid:
-			dist = math.sqrt((p[0] - car_pos[0])**2 + (p[1] - car_pos[1])**2)
-			if dist <= 15:
+			if car_rect.collidepoint(p):
 				expanded[p] = step + 1 + self.heuristic(p, target_pos)
-				
 		current_node = self.pick_node(expanded)
 		waypoints.append(current_node)
 		while not target_rect.collidepoint(current_node):
 			step += 1
-			self.expand_node(current_node, target_pos, grid, expanded, step)
+			expanded = self.expand_node(current_node, target_pos, grid, expanded, step)
 			current_node = self.pick_node(expanded)
+			
 			if current_node not in waypoints:
 				waypoints.append(current_node)
 				
-		return waypoints		
-			
+		return waypoints
+		#return [car_pos, (400, 600), (550, 700), target_pos]
 
 	def run(self):
 		current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -148,6 +142,7 @@ class Game:
 		ppu = 32
 		target = car.position * ppu
 		grid = self.walkable_space()
+		path = []
 			
 		while not self.exit:
 			dt = self.clock.get_time() / 1000
@@ -197,14 +192,12 @@ class Game:
 			# Drawing
 			self.screen.fill(grey)
 			
-			'''
-			for g in grid:
-				pygame.draw.circle(self.screen, green, g, 1, 1)
-			'''
-			
 			for l in self.lots:
 				l.render(self.screen)
 			
+			for g in grid:
+				pygame.draw.circle(self.screen, green, g, 1, 1)
+
 			
 			rotated = pygame.transform.rotate(car_image, car.angle)
 			rect = rotated.get_rect()
@@ -213,15 +206,18 @@ class Game:
 			# Route generation
 			clicked = pygame.mouse.get_pressed()
 			
+			
 			if clicked[0]:
 				target = pygame.mouse.get_pos()
+				path = self.find_path(car.position * ppu, target, grid)
+				
+				
 			pygame.draw.line(self.screen, orange, car.position * ppu, target, 10)
 			
 			
-			'''
-			for p in self.path:
-				pygame.draw.line(self.screen, orange, p, target, 10)
-			'''
+			for i in range(0, len(path) - 1):
+				pygame.draw.line(self.screen, orange, path[i], path[i + 1], 10)
+			
 			
 			pygame.display.flip()
 			
