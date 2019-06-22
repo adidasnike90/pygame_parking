@@ -127,7 +127,13 @@ class Game:
 		return res
 		
 	def find_path(self, car_pos, target_pos, grid):
-		target_rect = pygame.Rect(target_pos[0], target_pos[1], 30, 30)
+		end_pos = target_pos
+		min_v = float("inf")
+		for g in grid:
+			if math.sqrt((target_pos[0] - g[0])**2 + (target_pos[1] - g[1])**2) < min_v:
+				min_v = math.sqrt((target_pos[0] - g[0])**2 + (target_pos[1] - g[1])**2)
+				end_pos = g
+		
 		start_pos = car_pos
 		min_value = float("inf")
 		for g in grid:
@@ -144,12 +150,15 @@ class Game:
 		while len(open_list) != 0:
 			q = self.pick_node(open_list)
 			open_list.remove(q)
-			if target_rect.collidepoint(q.pos):
-				close_list.append(Node(target_pos))
+			if end_pos == q.pos:
+				close_list.append(Node(end_pos))
 				return close_list
 			q.neighbors = self.get_neighbors(q, grid)
 			for n in q.neighbors:
 				cost = q.g + 1
+				if end_pos == n.pos:
+					close_list.append(Node(end_pos))
+					return close_list
 				if n in open_list:
 					if n.g <= q.f:
 						continue
